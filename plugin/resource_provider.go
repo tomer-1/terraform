@@ -13,9 +13,17 @@ type ResourceProviderPlugin struct {
 }
 
 func (p *ResourceProviderPlugin) Server(b *plugin.MuxBroker) (interface{}, error) {
+	rp := p.ResourceProvider()
+
+	if provider, ok := rp.(*schema.Provider); ok {
+		// Here we ensure that Terraform 0.10 & 0.11 report at least approximate version
+		// as this field was added to the gRPC protocol in 0.12
+		provider.TerraformVersion = "0.11+compatible"
+	}
+
 	return &ResourceProviderServer{
 		Broker:   b,
-		Provider: p.ResourceProvider(),
+		Provider: rp,
 	}, nil
 }
 
@@ -517,6 +525,9 @@ func (s *ResourceProviderServer) ValidateResource(
 func (s *ResourceProviderServer) Configure(
 	config *terraform.ResourceConfig,
 	reply *ResourceProviderConfigureResponse) error {
+
+	// TODO: May need to cast s.Provider here and call Configure directly
+
 	err := s.Provider.Configure(config)
 	*reply = ResourceProviderConfigureResponse{
 		Error: plugin.NewBasicError(err),
